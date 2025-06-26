@@ -1,0 +1,192 @@
+DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>نظام حجز ملعب شباب قورص</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: Tahoma, sans-serif;
+      background: #f9f9f9;
+      direction: rtl;
+      padding: 20px;
+    }
+    h1, h2 {
+      background: #27ae60;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    .day {
+      margin-bottom: 20px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 5px #ccc;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .booked {
+      color: red;
+      font-weight: bold;
+    }
+    form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 30px;
+      box-shadow: 0 0 10px #ccc;
+      max-width: 600px;
+    }
+    input, select, button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background: #27ae60;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h1>المواعيد المتاحة في ملعب شباب قورص لمدة أسبوع</h1>
+<div id="schedule">جارٍ تحميل المواعيد...</div>
+
+<h2>احجز موعدك في ملعب شباب قورص</h2>
+<form id="booking-form">
+  <input type="text" id="name" placeholder="الاسم" required />
+  <input type="tel" id="phone" placeholder="رقم الهاتف" required />
+  <input type="date" id="date" required />
+  <select id="time" required>
+    <option value="">اختر وقت الحجز</option>
+  </select>
+  <button type="submit">إرسال الحجز</button>
+</form>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDy_zDn5-_wkxzflwvG6A2F52Kc1cTCxsY",
+    authDomain: "football-afb9d.firebaseapp.com",
+    projectId: "football-afb9d",
+    storageBucket: "football-afb9d.appspot.com",
+    messagingSenderId: "796485704795",
+    appId: "1:796485704795:web:0a1d11f5558fd40445737e",
+    measurementId: "G-Y85B4RBVXM"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const bookingsRef = collection(db, "bookings");
+
+  const allTimes = [
+    "3:00 مساءً - 4:00 مساءً",
+    "4:00 مساءً - 5:00 مساءً",
+    "5:00 مساءً - 6:00 مساءً",
+    "6:00 مساءً - 7:00 مساءً",
+    "7:00 مساءً - 8:00 مساءً",
+    "8:00 مساءً - 9:00 مساءً",
+    "9:00 مساءً - 10:00 مساءً",
+    "10:00 مساءً - 11:00 مساءً",
+    "11:00 مساءً - 12:00 صباحًا",
+    "12:00 صباحًا - 1:00 صباحًا"
+  ];
+
+  const selectTime = document.getElementById("time");
+  allTimes.forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    selectTime.appendChild(opt);
+  });
+
+  const formatDate = date => date.toISOString().split("T")[0];
+
+  const generateDates = () => {
+    const dates = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      dates.push({
+        label: d.toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" }),
+        value: formatDate(d)
+      });
+    }
+    return dates;
+  };
+
+  async function loadBookings() {
+    const snapshot = await getDocs(bookingsRef);
+    return snapshot.docs.map(doc => doc.data());
+  }
+
+  function renderSchedule(bookings) {
+    const schedule = document.getElementById("schedule");
+    schedule.innerHTML = "";
+    const dates = generateDates();
+
+    dates.forEach(day => {
+      const div = document.createElement("div");
+      div.className = "day";
+      const h2 = document.createElement("h2");
+      h2.textContent = day.label;
+      div.appendChild(h2);
+
+      const ul = document.createElement("ul");
+      allTimes.forEach(time => {
+        const li = document.createElement("li");
+        const isBooked = bookings.some(b => b.date === day.value && b.time === time);
+        li.innerHTML = isBooked ? `${time} <span class="booked">تم الحجز</span>` : time;
+        ul.appendChild(li);
+      });
+
+      div.appendChild(ul);
+      schedule.appendChild(div);
+    });
+  }
+
+  const bookings = await loadBookings();
+  renderSchedule(bookings);
+
+  document.getElementById("booking-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = document.getElementById("name").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const date = document.getElementById("date").value;
+    const time = document.getElementById("time").value;
+
+    const alreadyBooked = bookings.some(b => b.date === date && b.time === time);
+    if (alreadyBooked) {
+      alert("❌ هذا الموعد محجوز بالفعل.");
+      return;
+    }
+
+    await addDoc(bookingsRef, {
+      name, phone, date, time,
+      createdAt: new Date().toISOString()
+    });
+
+    alert("✅ تم الحجز بنجاح!");
+    location.reload();
+  });
+</script>
+
+</body>
+</html>
